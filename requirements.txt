@@ -1,0 +1,5 @@
+pygame>=2.6.0
+numpy>=2.3.3     # (optional, for math/arrays, useful for AI or physics)
+pillow>=11.3.0   # (optional, for image processing, spritesheets, etc.)
+flake8
+black
