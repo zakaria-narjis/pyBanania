@@ -44,5 +44,5 @@ Use the **arrow keys** to move Berti. To complete a level, you must collect all 
 You can create a standalone Windows executable using PyInstaller. First, make sure you have an icon file at the specified path (`assets/berti.ico`). Then, run the following command from the project's root directory:
 
 ```bash
-pyinstaller --onefile --windowed --add-data "assets;assets" --name "Banania" --icon="assets/berti.ico" run_game.py
+pyinstaller --onefile --windowed --add-data "assets;assets" --name "Banania" --icon="assets/berti.ico" main.py
 ```
