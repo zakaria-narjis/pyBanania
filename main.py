@@ -8,6 +8,7 @@ from banania.config import (
     UPS,
     LEVELS_PATH,
     ErrorCode,
+    ImageID,
 )
 from banania.game_engine import Game
 from banania.renderer import Renderer
@@ -43,7 +44,8 @@ def main():
 
     renderer = Renderer()
     audio_manager = AudioManager()
-
+    icon_surface = renderer.get_image(ImageID.BERTI_IDLE)
+    pygame.display.set_icon(icon_surface)
     all_levels = load_all_levels(LEVELS_PATH)
 
     # 1. Create the Game instance FIRST

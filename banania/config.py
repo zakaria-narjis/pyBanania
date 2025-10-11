@@ -1,11 +1,22 @@
 from enum import IntEnum
+import os
+import sys
 
+if getattr(sys, 'frozen', False):
+    # If the application is run as a bundle, the PyInstaller bootloader
+    # extends the sys module by a flag frozen=True and sets the app 
+    # path into variable _MEIPASS'.
+    base_path = sys._MEIPASS
+else:
+    # If running as a normal script, the base path is the script's directory
+    base_path = os.path.abspath(".")
+    
 JOYSTICK_SIZE = 0.4  # relative to smaller screen dimension
 UPS = 60  # updates per second
 NUM_RESOURCES = 197
-IMAGE_DIR = "assets/images/"
-SOUND_DIR = "assets/sound/"
-LEVELS_PATH = "assets/levels/levels.json"
+IMAGE_DIR = os.path.join(base_path, "assets", "images")
+SOUND_DIR = os.path.join(base_path, "assets", "sound")
+LEVELS_PATH = os.path.join(base_path, "assets", "levels", "levels.json")
 SCREEN_WIDTH = 537
 SCREEN_HEIGHT = 408
 LEV_OFFSET_X = 16
