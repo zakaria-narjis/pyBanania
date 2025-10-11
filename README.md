@@ -27,7 +27,7 @@ To run the game locally, you will need Python and Pygame installed.
     ```
 3.  Run the game:
     ```bash
-    python run_game.py
+    python main.py
     ```
 
 ## How to Play
