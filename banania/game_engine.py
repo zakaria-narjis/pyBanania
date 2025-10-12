@@ -14,6 +14,7 @@ from .entities import (
     Empty,
     Dummy,
     Vec,
+    Monster
 )
 from . import config
 from .config import ErrorCode, ImageID  # Import ErrorCode and ImageID
@@ -688,6 +689,11 @@ class Game:
             if isinstance(entity, Player):
                 self.berti_positions[entity.berti_id] = dest_pos
 
+            if isinstance(entity, Monster):
+                entity.check_player_capture(self)
+                # If the level ended, stop processing further moves in this frame
+                if self.level_ended != 0:
+                    return
     def remove_entity(self, entity_to_remove):
         if (
             self.level_array[entity_to_remove.x][entity_to_remove.y]

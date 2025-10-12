@@ -281,7 +281,18 @@ class Monster(Character):
         else:
             self.move_randomly(game)
 
-
+    def check_player_capture(self, game):
+        """Checks adjacent and diagonal tiles for a player to capture."""
+        for tile_pos in game.get_adjacent_tiles(self.x, self.y, include_diagonals=True):
+            entity = game.level_array[tile_pos.x][tile_pos.y]
+            if isinstance(entity, Player) and not entity.is_moving:
+                is_diagonal = abs(self.x - tile_pos.x) == 1 and abs(self.y - tile_pos.y) == 1
+                if is_diagonal:
+                    obstacle1 = not isinstance(game.level_array[tile_pos.x][self.y], (Empty, Dummy))
+                    obstacle2 = not isinstance(game.level_array[self.x][tile_pos.y], (Empty, Dummy))
+                    if obstacle1 or obstacle2: continue
+                game.end_level(caught=True)
+                return
 class PurpleMonster(Monster):
     def __init__(self, x, y):
         super().__init__(x, y, config.Entity.PURPLE_MONSTER)
