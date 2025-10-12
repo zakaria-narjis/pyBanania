@@ -12,7 +12,7 @@ else:
     base_path = os.path.abspath(".")
     
 JOYSTICK_SIZE = 0.4  # relative to smaller screen dimension
-UPS = 90  # updates per second
+UPS = 60  # updates per second
 NUM_RESOURCES = 197
 IMAGE_DIR = os.path.join(base_path, "assets", "images")
 SOUND_DIR = os.path.join(base_path, "assets", "sound")

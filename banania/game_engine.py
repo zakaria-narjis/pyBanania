@@ -14,7 +14,9 @@ from .entities import (
     Empty,
     Dummy,
     Vec,
-    Monster
+    Monster,
+    Block,
+    Character,
 )
 from . import config
 from .config import ErrorCode, ImageID  # Import ErrorCode and ImageID
@@ -359,26 +361,42 @@ class Game:
 
     def is_walkable(self, x, y, direction):
         """
-        Checks if an entity at (x, y) can move in a given direction using strict rules.
+        Checks if an entity at (x, y) can move in a given direction.
+        This is the definitive gatekeeper for all movement.
         """
         dest = self.dir_to_coords(x, y, direction)
         
+        # Rule 0: Cannot move out of bounds.
         if not self.is_in_bounds(dest.x, dest.y):
             return False
 
         entity_at_src = self.level_array[x][y]
         entity_at_dest = self.level_array[dest.x][dest.y]
         
-        # A tile is walkable if it's empty OR if the entity on it is already moving away.
-        if isinstance(entity_at_dest, Empty) or entity_at_dest.is_moving:
+        # Rule 1: A tile claimed by a Dummy is ALWAYS unwalkable.
+        if isinstance(entity_at_dest, Dummy):
+            return False
+
+        # Rule 2: An empty tile is always walkable.
+        if isinstance(entity_at_dest, Empty):
             return True
 
+        # Rule 3: The player can always move onto a consumable item.
         if isinstance(entity_at_src, Player) and entity_at_dest.consumable:
             return True
             
+        # Rule 4: A tile with a moving entity is walkable, ONLY if it's not a direct swap.
+        if entity_at_dest.is_moving:
+            their_destination = self.dir_to_coords(entity_at_dest.x, entity_at_dest.y, entity_at_dest.face_dir)
+            is_swapping = (their_destination.x == x and their_destination.y == y)
+            return not is_swapping # Returns True if they are NOT swapping places.
+
+        # Rule 5: A pushable entity can be moved if the space behind it is walkable.
         if entity_at_src.can_push and entity_at_dest.pushable and not entity_at_dest.is_moving:
+            # Recursive call to check the tile behind the pushable object.
             return self.is_walkable(dest.x, dest.y, direction)
         
+        # Rule 6: Any other entity (idle monster, static block) makes the tile unwalkable.
         return False
 
     def start_move(self, x, y, direction):
@@ -387,6 +405,12 @@ class Game:
         """
         entity = self.level_array[x][y]
         dest = self.dir_to_coords(x, y, direction)
+
+        # Add a defensive check to prevent multiple entities moving to the same tile.
+        # If the destination is already reserved by a Dummy, abort the move.
+        dest_entity_check = self.level_array[dest.x][dest.y]
+        if isinstance(dest_entity_check, (Dummy, Character)):
+            return # Abort move: Tile is already claimed in this game tick.
 
         entity.is_moving = True
         entity.face_dir = direction

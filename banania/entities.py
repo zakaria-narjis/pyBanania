@@ -212,9 +212,10 @@ class Monster(Character):
             player_dest = game.dir_to_coords(player_entity.x, player_entity.y, player_entity.face_dir)
             
             # Check if that destination is adjacent (including diagonals) to the monster's current position.
-            is_adjacent_to_dest = abs(player_dest.x - self.x) <= 1 and abs(player_dest.y - self.y) <= 1
+            is_orthogonally_adjacent = abs(player_dest.x - self.x) + abs(player_dest.y - self.y) == 1
             
-            if is_adjacent_to_dest:
+            if is_orthogonally_adjacent:
+                print("Monster sees player moving into adjacent tile, capturing!")
                 return
 
         if not self.sees_berti:
@@ -246,7 +247,7 @@ class Monster(Character):
         """Checks adjacent and diagonal tiles for a player to capture."""
         for tile_pos in game.get_adjacent_tiles(self.x, self.y, include_diagonals=True):
             entity = game.level_array[tile_pos.x][tile_pos.y]
-            if isinstance(entity, Player) and not entity.is_moving:
+            if isinstance(entity, Player):
                 is_diagonal = abs(self.x - tile_pos.x) == 1 and abs(self.y - tile_pos.y) == 1
                 if is_diagonal:
                     obstacle1 = not isinstance(game.level_array[tile_pos.x][self.y], (Empty, Dummy))
