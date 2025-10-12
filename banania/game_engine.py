@@ -362,26 +362,23 @@ class Game:
         Checks if an entity at (x, y) can move in a given direction using strict rules.
         """
         dest = self.dir_to_coords(x, y, direction)
-
+        
         if not self.is_in_bounds(dest.x, dest.y):
             return False
 
         entity_at_src = self.level_array[x][y]
         entity_at_dest = self.level_array[dest.x][dest.y]
-
-        if isinstance(entity_at_dest, Empty):
+        
+        # A tile is walkable if it's empty OR if the entity on it is already moving away.
+        if isinstance(entity_at_dest, Empty) or entity_at_dest.is_moving:
             return True
 
         if isinstance(entity_at_src, Player) and entity_at_dest.consumable:
             return True
-
-        if (
-            entity_at_src.can_push
-            and entity_at_dest.pushable
-            and not entity_at_dest.is_moving
-        ):
+            
+        if entity_at_src.can_push and entity_at_dest.pushable and not entity_at_dest.is_moving:
             return self.is_walkable(dest.x, dest.y, direction)
-
+        
         return False
 
     def start_move(self, x, y, direction):

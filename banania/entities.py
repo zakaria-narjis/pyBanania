@@ -182,32 +182,17 @@ class Monster(Character):
 
         self.time_since_noise += 1
         closest_berti_pos = None
-        min_dist = float("inf")
+        min_dist = float('inf')
 
-        # This part remains the same...
         for berti_pos in game.berti_positions:
             is_in_front = (
-                (
-                    self.face_dir == config.Direction.DOWN
-                    and berti_pos.y >= self.y
-                )
-                or (
-                    self.face_dir == config.Direction.UP
-                    and berti_pos.y <= self.y
-                )
-                or (
-                    self.face_dir == config.Direction.LEFT
-                    and berti_pos.x <= self.x
-                )
-                or (
-                    self.face_dir == config.Direction.RIGHT
-                    and berti_pos.x >= self.x
-                )
+                (self.face_dir == config.Direction.DOWN and berti_pos.y >= self.y) or
+                (self.face_dir == config.Direction.UP and berti_pos.y <= self.y) or
+                (self.face_dir == config.Direction.LEFT and berti_pos.x <= self.x) or
+                (self.face_dir == config.Direction.RIGHT and berti_pos.x >= self.x)
             )
-
-            if is_in_front and game.can_see_tile(
-                self.x, self.y, berti_pos.x, berti_pos.y
-            ):
+            
+            if is_in_front and game.can_see_tile(self.x, self.y, berti_pos.x, berti_pos.y):
                 dist = abs(berti_pos.x - self.x) + abs(berti_pos.y - self.y)
                 if dist < min_dist:
                     min_dist = dist
@@ -217,69 +202,45 @@ class Monster(Character):
             self.sees_berti = False
             self.move_randomly(game)
             return
-
-        # ====================================================================
-        # START OF NEW LOGIC
-        # ====================================================================
-
+       
         # Get the actual player object the monster is chasing.
-        player_entity = game.level_array[closest_berti_pos.x][
-            closest_berti_pos.y
-        ]
+        player_entity = game.level_array[closest_berti_pos.x][closest_berti_pos.y]
 
         # Check if the player is currently in the middle of a move.
         if player_entity.is_moving:
             # Calculate where the player will end up after their move.
-            player_dest = game.dir_to_coords(
-                player_entity.x, player_entity.y, player_entity.face_dir
-            )
-
+            player_dest = game.dir_to_coords(player_entity.x, player_entity.y, player_entity.face_dir)
+            
             # Check if that destination is adjacent (including diagonals) to the monster's current position.
-            is_adjacent_to_dest = (
-                abs(player_dest.x - self.x) <= 1
-                and abs(player_dest.y - self.y) <= 1
-            )
-
-            # If the player is moving into a "danger zone" next to the monster...
+            is_adjacent_to_dest = abs(player_dest.x - self.x) <= 1 and abs(player_dest.y - self.y) <= 1
+            
             if is_adjacent_to_dest:
-                # ...the monster's best move is to do nothing. It holds its position.
                 return
 
         if not self.sees_berti:
             self.sees_berti = True
             if self.time_since_noise > random.randint(3, 13):
                 self.time_since_noise = 0
-                if self.id == config.Entity.PURPLE_MONSTER:
-                    game.audio_manager.play_sound("monster_spot_purple")
-                elif self.id == config.Entity.GREEN_MONSTER:
-                    game.audio_manager.play_sound("monster_spot_green")
+                if self.id == config.Entity.PURPLE_MONSTER: game.audio_manager.play_sound('monster_spot_purple')
+                elif self.id == config.Entity.GREEN_MONSTER: game.audio_manager.play_sound('monster_spot_green')
 
         diff_x = closest_berti_pos.x - self.x
         diff_y = closest_berti_pos.y - self.y
 
         dir1, dir2 = None, None
         if abs(diff_x) > abs(diff_y):
-            dir1 = (
-                config.Direction.RIGHT if diff_x > 0 else config.Direction.LEFT
-            )
+            dir1 = config.Direction.RIGHT if diff_x > 0 else config.Direction.LEFT
             dir2 = config.Direction.DOWN if diff_y > 0 else config.Direction.UP
         else:
             dir1 = config.Direction.DOWN if diff_y > 0 else config.Direction.UP
-            dir2 = (
-                config.Direction.RIGHT if diff_x > 0 else config.Direction.LEFT
-            )
+            dir2 = config.Direction.RIGHT if diff_x > 0 else config.Direction.LEFT
+        
+        if diff_y == 0: dir2 = None
+        if diff_x == 0: dir2 = None
 
-        if diff_y == 0:
-            dir2 = None
-        if diff_x == 0:
-            dir2 = None
-
-        if game.is_walkable(self.x, self.y, dir1):
-            game.start_move(self.x, self.y, dir1)
-        elif dir2 and game.is_walkable(self.x, self.y, dir2):
-            game.start_move(self.x, self.y, dir2)
-        else:
-            self.move_randomly(game)
+        if game.is_walkable(self.x, self.y, dir1): game.start_move(self.x, self.y, dir1)
+        elif dir2 and game.is_walkable(self.x, self.y, dir2): game.start_move(self.x, self.y, dir2)
+        else: self.move_randomly(game)
 
     def check_player_capture(self, game):
         """Checks adjacent and diagonal tiles for a player to capture."""
