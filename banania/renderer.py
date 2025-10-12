@@ -11,11 +11,12 @@ from .config import (
     ImageID,
     IMAGE_DIR,
     IMG_DIGIT_LOOKUP,
+    Direction,
 )
 
 # Constants for rendering logic, mirroring the JS implementation
 TILE_SIZE = 24  # The JS version uses 24x24 tiles
-ANIMATION_DURATION_MS = 100  # Time in ms for one animation frame
+ANIMATION_DURATION_MS = 50  # Time in ms for one animation frame
 
 
 class Renderer:
@@ -213,8 +214,8 @@ class Renderer:
         """Updates the animation frame for a single entity based on its state."""
         block = game.level_array[x][y]
 
-        # Handle static states (win/loss) first for the player
-        if block.id == Entity.PLAYER_BERTI:
+        # --- 1. Handle special static states first (win/loss for player) ---
+        if hasattr(block, 'id') and block.id == Entity.PLAYER_BERTI:
             if game.level_ended == 1:
                 block.animation_frame = ImageID.BERTI_CELEBRATING
                 return
@@ -222,45 +223,49 @@ class Renderer:
                 block.animation_frame = ImageID.BERTI_DEAD
                 return
 
-        # Determine the correct animation strip for the entity's current state
+        # --- 2. Get the base animation frame for the current state ---
         start_id = self._get_animation_start_frame(block)
+        if start_id == -1:
+            return # Not an animatable entity
 
-        # Exit if not an animated character or in a non-animated state (like Berti's idle)
-        if start_id == -1 or (
-            block.id == Entity.PLAYER_BERTI and not block.is_moving
-        ):
-            block.animation_frame = (
-                start_id if start_id != -1 else block.animation_frame
-            )
+        # --- 3. Explicitly handle the different states ---
+        is_moving = hasattr(block, 'is_moving') and block.is_moving
+        
+        # For Berti's idle state, it's a single static frame.
+        if hasattr(block, 'id') and block.id == Entity.PLAYER_BERTI and not is_moving:
+            block.animation_frame = ImageID.BERTI_IDLE
             return
 
-        # Determine if it's time to advance the animation frame
+        # For all other animated states (monster idle, all character movement):
+        # Determine if the entity's core state has changed (e.g., idle -> walking).
+        # We detect this if the current animation frame is outside the new animation strip.
+        is_in_correct_strip = (start_id <= block.animation_frame < start_id + self.ANIM_LENGTH)
+
+        # Check if it's time to advance the animation frame
         advance_frame = False
         current_time_ms = pygame.time.get_ticks()
-        if not hasattr(block, "last_anim_time"):
+        if not hasattr(block, 'last_anim_time'):
             block.last_anim_time = 0
-
         if current_time_ms - block.last_anim_time > ANIMATION_DURATION_MS:
             advance_frame = True
             block.last_anim_time = current_time_ms
 
-        # If the character's state has changed, reset the animation to the new strip
-        if (
-            not hasattr(block, "anim_index")
-            or block.animation_frame < start_id
-            or block.animation_frame >= start_id + self.ANIM_LENGTH
-        ):
-            block.animation_frame = start_id
+        # If the state has changed or animation is uninitialized, reset it.
+        if not hasattr(block, 'anim_index') or not is_in_correct_strip:
             block.anim_index = 0
-        # Otherwise, advance the frame if it's time
+            block.animation_frame = start_id
+        # Otherwise, if it's time, advance the animation to the next frame.
         elif advance_frame:
             block.anim_index = (block.anim_index + 1) % self.ANIM_LENGTH
             block.animation_frame = start_id + block.anim_index
+
 
     def update_all_animations(self, game):
         """Iterates through all entities and updates their animations."""
         # ADD THIS CHECK: If we are not in the main game mode, do nothing.
         if game.mode != 1:
+            return
+        if game.is_paused:
             return
         for y in range(LEV_DIMENSION_Y):
             for x in range(LEV_DIMENSION_X):

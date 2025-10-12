@@ -183,18 +183,27 @@ class Game:
 
         # --- NOW, process all collected moves at once ---
         if self.completed_moves:
-            moved_players = [
-                e for e in self.completed_moves if isinstance(e, Player)
-            ]
+            # Create a copy of the list, as the original will be cleared on the next tick.
+            entities_that_just_moved = self.completed_moves[:]
 
-            self._process_completed_moves(self.completed_moves)
+            # First, finalize the completed moves in the grid.
+            # This sets their is_moving flag to False.
+            self._process_completed_moves(entities_that_just_moved)
 
-            if not self.single_steps:
-                for player in moved_players:
-                    if self.level_array[player.x][player.y] == player:
-                        player.handle_input(
-                            self, input_handler, self.single_steps
-                        )
+            # NOW, immediately re-evaluate the entities that just finished moving.
+            # This allows them to start a new move in the same tick, preventing a flicker.
+            for entity in entities_that_just_moved:
+                # Sanity check: ensure the entity is still where it should be.
+                if self.level_array[entity.x][entity.y] != entity:
+                    continue
+
+                # If it's a player, handle input again.
+                if isinstance(entity, Player) and not self.single_steps:
+                    entity.handle_input(self, input_handler, self.single_steps)
+                
+                # If it's a monster, run its AI again.
+                elif isinstance(entity, (PurpleMonster, GreenMonster)):
+                    entity.update_ai(self)
 
         # --- FINALLY, check for game over conditions ---
         for berti_pos in self.berti_positions:
