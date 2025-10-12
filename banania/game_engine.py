@@ -403,28 +403,26 @@ class Game:
         """
         Initiates the visual movement of an entity.
         """
+        # SAFETY CHECK: Verify the move is actually walkable
+        if not self.is_walkable(x, y, direction):
+            return  # Abort the move if it's not valid
+        
         entity = self.level_array[x][y]
         dest = self.dir_to_coords(x, y, direction)
 
-        # Add a defensive check to prevent multiple entities moving to the same tile.
-        # If the destination is already reserved by a Dummy, abort the move.
-        dest_entity_check = self.level_array[dest.x][dest.y]
-        if isinstance(dest_entity_check, (Dummy, Character)):
-            return # Abort move: Tile is already claimed in this game tick.
-
         entity.is_moving = True
         entity.face_dir = direction
-
+        
         if isinstance(entity, Player):
             self.steps_taken += 1
-            self.save_manager.progressed = True  # Mark progress on move
+            self.save_manager.progressed = True # Mark progress on move
 
         dest_entity = self.level_array[dest.x][dest.y]
-
+        
         if isinstance(dest_entity, Empty):
             self.level_array[dest.x][dest.y] = Dummy(dest.x, dest.y)
         elif dest_entity.consumable:
-            pass
+            pass 
         elif not dest_entity.is_moving:
             entity.is_pushing = True
             self.start_move(dest.x, dest.y, direction)

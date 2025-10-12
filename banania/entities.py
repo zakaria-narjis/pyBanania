@@ -215,7 +215,6 @@ class Monster(Character):
             is_orthogonally_adjacent = abs(player_dest.x - self.x) + abs(player_dest.y - self.y) == 1
             
             if is_orthogonally_adjacent:
-                print("Monster sees player moving into adjacent tile, capturing!")
                 return
 
         if not self.sees_berti:
