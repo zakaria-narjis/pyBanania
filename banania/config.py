@@ -78,6 +78,7 @@ class ErrorCode(IntEnum):
     WRONGPW = 3
     NOTFOUND = 4
     EMPTYNAME = 5
+    SAVEFAIL = 6
 
 
 # --- Images ---

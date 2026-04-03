@@ -193,6 +193,9 @@ class Game:
             # This sets their is_moving flag to False.
             self._process_completed_moves(entities_that_just_moved)
 
+            if self.level_ended != 0:
+                return
+
             # NOW, immediately re-evaluate the entities that just finished moving.
             # This allows them to start a new move in the same tick, preventing a flicker.
             for entity in entities_that_just_moved:
@@ -387,8 +390,9 @@ class Game:
         # Rule 3: The player can always move onto a consumable item.
         if isinstance(entity_at_src, Player) and entity_at_dest.consumable:
             return True  
-        # Rule 4: A pushable entity can be moved if the space behind it is walkable.
-        if  entity_at_dest.pushable and entity_at_src.can_push:
+        # Rule 4: A pushable entity can be moved if it is not already moving and
+        # the space behind it is walkable.
+        if entity_at_dest.pushable and entity_at_src.can_push and not entity_at_dest.is_moving:
             # Recursive call to check the tile behind the pushable object.
             if dest.x == x+1 and dest.y == y:
                 return self.is_walkable(dest.x, dest.y, config.Direction.RIGHT)
@@ -398,7 +402,7 @@ class Game:
                 return self.is_walkable(dest.x, dest.y, config.Direction.DOWN)
             if dest.x == x and dest.y == y-1:
                 return self.is_walkable(dest.x, dest.y, config.Direction.UP)
-        # Rule 5: An entity that is already moving cannot be pushed. 
+        # Rule 5: An entity that is already moving cannot be pushed.
         if entity_at_dest.pushable and entity_at_dest.is_moving:
             return False
         # Rule 6: A tile with a moving entity is walkable, ONLY if it's not a direct swap and no other entity is moving there.
@@ -440,33 +444,6 @@ class Game:
         elif not dest_entity.is_moving:
             entity.is_pushing = True
             self.start_move(dest.x, dest.y, direction)
-
-    def move(self, x, y, direction):
-        """
-        Finalizes a move action, updating the logical positions in the grid.
-        """
-        src_entity = self.level_array[x][y]
-        dest_pos = self.dir_to_coords(x, y, direction)
-
-        src_entity.is_moving = False
-        src_entity.moving_offset = Vec(0, 0)
-        src_entity.is_pushing = False
-
-        dest_entity = self.level_array[dest_pos.x][dest_pos.y]
-
-        if isinstance(src_entity, Player) and dest_entity.consumable:
-            if isinstance(dest_entity, Banana):
-                self.bananas_remaining -= 1
-                if self.bananas_remaining <= 0:
-                    self.end_level(won=True)
-
-        self.level_array[dest_pos.x][dest_pos.y] = src_entity
-        self.level_array[x][y] = Empty(x, y)
-
-        src_entity.x, src_entity.y = dest_pos.x, dest_pos.y
-
-        if isinstance(src_entity, Player):
-            self.berti_positions[src_entity.berti_id] = dest_pos
 
     ## 4. AI and Utility Methods
     # =================================================================================
@@ -534,8 +511,10 @@ class Game:
                     walk1_x, walk1_y, walk2_x, walk2_y = 0, -1, -1, -1
 
         x_offset, y_offset = 0, 0
+        max_iterations = abs(diff_x) + abs(diff_y) + 1
 
-        while True:
+        while max_iterations > 0:
+            max_iterations -= 1
             x_ratio1 = (x_offset + walk1_x) / diff_x if diff_x != 0 else 1
             x_ratio2 = (x_offset + walk2_x) / diff_x if diff_x != 0 else 1
             y_ratio1 = (y_offset + walk1_y) / diff_y if diff_y != 0 else 1
@@ -557,6 +536,8 @@ class Game:
                 and not current_entity.is_small
             ):
                 return False
+
+        return False  # Exceeded iteration limit — treat as blocked
 
     def get_adjacent_tiles(self, x, y, include_diagonals=False):
         adj = []
@@ -689,29 +670,25 @@ class Game:
         self.audio_manager.toggle_sound()
 
     def _process_completed_moves(self, moves_to_process):
+        # Pass 1: clear all source cells so push chains don't block placements.
         for entity in moves_to_process:
             if self.level_array[entity.x][entity.y] == entity:
-                self.level_array[entity.x][entity.y] = Empty(
-                    entity.x, entity.y
-                )
+                self.level_array[entity.x][entity.y] = Empty(entity.x, entity.y)
 
+        # Pass 2: place all entities at their destinations.
+        monsters_to_check = []
         for entity in moves_to_process:
             dest_pos = self.dir_to_coords(entity.x, entity.y, entity.face_dir)
-
             target_tile_entity = self.level_array[dest_pos.x][dest_pos.y]
 
             if isinstance(entity, Player) and target_tile_entity.consumable:
                 if isinstance(target_tile_entity, Banana):
                     self.bananas_remaining -= 1
-
                 target_tile_entity.consume(self)
-
                 if self.bananas_remaining <= 0:
                     self.end_level(won=True)
 
-            if isinstance(
-                self.level_array[dest_pos.x][dest_pos.y], (Empty, Dummy)
-            ):
+            if isinstance(self.level_array[dest_pos.x][dest_pos.y], (Empty, Dummy)):
                 self.level_array[dest_pos.x][dest_pos.y] = entity
 
             entity.x, entity.y = dest_pos.x, dest_pos.y
@@ -723,10 +700,14 @@ class Game:
                 self.berti_positions[entity.berti_id] = dest_pos
 
             if isinstance(entity, Monster):
-                entity.check_player_capture(self)
-                # If the level ended, stop processing further moves in this frame
-                if self.level_ended != 0:
-                    return
+                monsters_to_check.append(entity)
+
+        # Pass 3: check captures only after ALL entities are placed.
+        # Deferring this prevents the early-return from leaving entities stranded.
+        for monster in monsters_to_check:
+            monster.check_player_capture(self)
+            if self.level_ended != 0:
+                return
     def remove_entity(self, entity_to_remove):
         if (
             self.level_array[entity_to_remove.x][entity_to_remove.y]

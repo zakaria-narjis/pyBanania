@@ -42,9 +42,7 @@ class AudioManager:
             "opendoor": "opendoor.mp3",
             "wow": "wow.mp3",
             "yeah": "yeah.mp3",
-            # --- ADD THESE ---
-            # NOTE: You will need to ensure you have sound files with these names.
-            # I've mapped them to existing files as placeholders.
+            "pickup_key": "opendoor.mp3",
             "monster_spot_purple": "attack1.mp3",
             "monster_spot_green": "attack2.mp3",
             "level_win": "wow.mp3",
@@ -59,7 +57,8 @@ class AudioManager:
 
     def play_sound(self, name):
         """Plays a loaded sound effect if sound is enabled."""
-        # if not self.sounds or not self.sound_enabled: return # This line is why sound might be off
+        if not self.sounds or not self.sound_enabled:
+            return
         if name in self.sounds:
             self.sounds[name].set_volume(self.volume)
             self.sounds[name].play()

@@ -36,12 +36,13 @@ class InputHandler:
 
             # --- 1. Delegate to UI Manager First ---
             # The UI manager handles its own events (clicks, typing, etc.) and can
-            # effectively "consume" them, preventing them from affecting the game.
+            # "consume" them, preventing them from affecting the game world.
+            ui_consumed = False
             if ui_manager:
-                ui_manager.handle_event(event)
+                ui_consumed = ui_manager.handle_event(event)
 
-            # --- 2. Process Game-World Input ---
-            if event.type == pygame.KEYDOWN:
+            # --- 2. Process Game-World Input (only if UI didn't consume the event) ---
+            if not ui_consumed and event.type == pygame.KEYDOWN:
                 # This block captures a single key press event for single-step mode
                 # and updates the map for resolving diagonal movement.
                 if event.key in (pygame.K_UP, pygame.K_w):

@@ -105,9 +105,6 @@ def main():
     is_running = True
     while is_running:
         # 1. Process Input
-        # We now get the state directly from the game object via the callback
-        _ = game.get_full_state()
-
         input_handler.process_events(ui_manager)
         if input_handler.quit_requested:
             is_running = False

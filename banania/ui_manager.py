@@ -84,6 +84,8 @@ class Label:
 class InputField:
     """A text input field for dialog boxes."""
 
+    MAX_LENGTH = 32
+
     def __init__(self, rect, font, is_password=False):
         self.rect = pygame.Rect(rect)
         self.font = font
@@ -102,7 +104,7 @@ class InputField:
                 self.text = self.text[:-1]
             elif event.key == pygame.K_RETURN:
                 self.active = False
-            else:
+            elif len(self.text) < self.MAX_LENGTH:
                 self.text += event.unicode
             return True
         return False
@@ -342,6 +344,7 @@ class SaveLoadDialog(DialogBox):
             ErrorCode.NOSAVE: "Error - there are no savegames to load!",
             ErrorCode.NOTFOUND: "Error - this save name couldn't be found.",
             ErrorCode.EMPTYNAME: "Error - please enter a save name.",
+            ErrorCode.SAVEFAIL: "Error - could not save the file.",
         }
         self.error_label.text = error_messages.get(code, "Unknown error")
         self.error_label.surface = self.font.render(
@@ -606,29 +609,38 @@ class UIManager:
         self.selected_menu_item = -1
 
     def handle_event(self, event):
+        """Handle a UI event. Returns True if the event was consumed by the UI."""
         if self.active_dialog:
             self.active_dialog.handle_event(event)
-            return
+            return True
 
         if event.type == pygame.KEYDOWN and event.key in self.hotkey_map:
             self._trigger_menu_effect(self.hotkey_map[event.key])
-            return
+            return True
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            # --- MODIFICATION START ---
-            # Check for volume bar click first. If it returns True, the event is handled.
             if self._handle_volume_click(event.pos):
-                return
-            # --- MODIFICATION END ---
+                return True
             self._handle_menu_click(event.pos)
             self._handle_main_buttons_click(event.pos)
 
         if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
             self.main_buttons_pressed = [False, False, False]
 
+        # Consume keyboard events while a dropdown menu is open
+        if self.selected_menu_item != -1 and event.type == pygame.KEYDOWN:
+            return True
+
+        return False
+
     def update(self, dt):
         if self.active_dialog:
             self.active_dialog.update(dt)
+        self.berti_blink_time -= 1
+        if self.berti_blink_time == 99:   # blink phase (>=100) just ended
+            self.berti_blink_time = 95
+        elif self.berti_blink_time < 0:
+            self.berti_blink_time = 103
 
     # --- NEW METHOD START ---
     def _handle_volume_click(self, mouse_pos):
@@ -763,21 +775,10 @@ class UIManager:
 
         if self.main_buttons_pressed[1]:
             surface.blit(self.res.get_image(ImageID.BTN_BERTI_DOWN), (253, 35))
+        elif self.berti_blink_time >= 100:
+            surface.blit(self.res.get_image(ImageID.BTN_BERTI_BLINK_UP), (253, 35))
         else:
-            if self.berti_blink_time >= 100:
-                surface.blit(
-                    self.res.get_image(ImageID.BTN_BERTI_BLINK_UP), (253, 35)
-                )
-                self.berti_blink_time -= 1
-                if self.berti_blink_time < 100:
-                    self.berti_blink_time = 95
-            else:
-                surface.blit(
-                    self.res.get_image(ImageID.BTN_BERTI_UP), (253, 35)
-                )
-                self.berti_blink_time -= 1
-                if self.berti_blink_time < 0:
-                    self.berti_blink_time = 103
+            surface.blit(self.res.get_image(ImageID.BTN_BERTI_UP), (253, 35))
 
         if not activated_buttons[2]:
             surface.blit(
