@@ -66,6 +66,7 @@ def main():
         "toggle_pause": game.toggle_pause,
         "toggle_sound": game.toggle_sound,
         "toggle_single_steps": game.toggle_single_steps,
+        "toggle_turn_based": game.toggle_turn_based,
         # --- ADD THESE THREE LINES ---
         "previous_level": game.previous_level,
         "reset_level": game.reset_level,

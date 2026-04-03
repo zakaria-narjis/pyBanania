@@ -125,6 +125,13 @@ class Game:
         self.save_manager = SaveGameManager()
         self.completed_moves = []
 
+        # --- Turn-Based Mode ---
+        self.turn_based = False
+        self.tb_state = "WAITING_PLAYER"  # WAITING_PLAYER | ANIMATING_PLAYER | ANIMATING_MONSTER
+        self.tb_current_monster_index = 0
+        self.tb_monsters = []  # Ordered list of monster references for current round
+        self.tb_turn_orders = {}  # Maps id(entity) -> turn order number
+
     def update(self, input_handler):
         """
         The main logic update, called once per frame from your main game loop.
@@ -139,6 +146,10 @@ class Game:
 
         if self.wait_timer > 0:
             self.wait_timer -= 1
+            return
+
+        if self.turn_based:
+            self.update_turn_based(input_handler)
             return
 
         if self.level_ended != 0:
@@ -217,6 +228,129 @@ class Game:
             if isinstance(player, Player):
                 player.check_enemy_proximity(self)
 
+    def update_turn_based(self, input_handler):
+        """
+        Turn-based update loop. Called from update() when turn_based is True.
+        Uses a state machine: WAITING_PLAYER -> ANIMATING_PLAYER -> ANIMATING_MONSTER -> WAITING_PLAYER
+        """
+        if self.level_ended != 0:
+            if self.level_ended == 1:
+                self.next_level()
+            elif self.level_ended == 2:
+                self.reset_level()
+            return
+
+        # Tick all entity visual tweens every frame regardless of state
+        self.completed_moves.clear()
+        for y in range(config.LEV_DIMENSION_Y):
+            for x in range(config.LEV_DIMENSION_X):
+                entity = self.level_array[x][y]
+                entity.just_moved = False
+                entity.update(self)
+
+        # Process any moves that completed this tick
+        if self.completed_moves:
+            entities_that_just_moved = self.completed_moves[:]
+            self._process_completed_moves(entities_that_just_moved)
+            if self.level_ended != 0:
+                return
+
+            if self.tb_state == "ANIMATING_PLAYER":
+                # Player animation done — check proximity then start monster turns
+                for berti_pos in self.berti_positions:
+                    player = self.level_array[berti_pos.x][berti_pos.y]
+                    if isinstance(player, Player):
+                        player.check_enemy_proximity(self)
+                if self.level_ended != 0:
+                    return
+                if self.tb_monsters:
+                    self.tb_state = "ANIMATING_MONSTER"
+                    self.tb_current_monster_index = 0
+                    self._tb_trigger_next_monster()
+                else:
+                    self.tb_state = "WAITING_PLAYER"
+
+            elif self.tb_state == "ANIMATING_MONSTER":
+                # Current monster animation done — advance to next monster
+                if self.level_ended != 0:
+                    return
+                self.tb_current_monster_index += 1
+                if self.tb_current_monster_index < len(self.tb_monsters):
+                    self._tb_trigger_next_monster()
+                else:
+                    self.tb_state = "WAITING_PLAYER"
+            return
+
+        # No animations in progress — handle state logic
+        if self.tb_state == "WAITING_PLAYER":
+            # Poll for a single keypress from the player
+            for berti_pos in self.berti_positions:
+                entity = self.level_array[berti_pos.x][berti_pos.y]
+                if isinstance(entity, Player) and not entity.is_moving:
+                    pressed_dir = input_handler.get_direction(True)  # always single-step
+                    if pressed_dir != config.Direction.NONE and self.is_walkable(
+                        entity.x, entity.y, pressed_dir
+                    ):
+                        self.start_move(entity.x, entity.y, pressed_dir)
+                        self.tb_state = "ANIMATING_PLAYER"
+                        self._tb_build_monster_list()
+
+        elif self.tb_state == "ANIMATING_MONSTER":
+            # Monster had no move available — skip it and advance
+            self.tb_current_monster_index += 1
+            if self.tb_current_monster_index < len(self.tb_monsters):
+                self._tb_trigger_next_monster()
+            else:
+                self.tb_state = "WAITING_PLAYER"
+
+    def _tb_build_monster_list(self):
+        """Scans the grid and builds the ordered monster list for this round (row-major order)."""
+        self.tb_monsters = []
+        for y in range(config.LEV_DIMENSION_Y):
+            for x in range(config.LEV_DIMENSION_X):
+                entity = self.level_array[x][y]
+                if isinstance(entity, (PurpleMonster, GreenMonster)):
+                    self.tb_monsters.append(entity)
+        self.tb_current_monster_index = 0
+
+    def _tb_trigger_next_monster(self):
+        """Triggers the AI for the current monster, skipping any that are stuck or removed."""
+        while self.tb_current_monster_index < len(self.tb_monsters):
+            monster = self.tb_monsters[self.tb_current_monster_index]
+            # Verify the monster is still alive and at its expected position
+            if self.level_array[monster.x][monster.y] is monster:
+                monster.update_ai(self)
+                if monster.is_moving:
+                    return  # Animation started — wait for it to complete
+                # Monster couldn't move; try the next one
+            self.tb_current_monster_index += 1
+        # All monsters processed
+        self.tb_state = "WAITING_PLAYER"
+
+    def _tb_assign_turn_orders(self):
+        """Assigns turn order numbers to all character entities after a level load."""
+        self.tb_turn_orders = {}
+        turn = 1
+        # Player is always turn 1 (scan for player first)
+        for y in range(config.LEV_DIMENSION_Y):
+            for x in range(config.LEV_DIMENSION_X):
+                entity = self.level_array[x][y]
+                if isinstance(entity, Player):
+                    self.tb_turn_orders[id(entity)] = turn
+                    turn += 1
+        # Monsters get turns 2, 3, 4... in row-major scan order
+        for y in range(config.LEV_DIMENSION_Y):
+            for x in range(config.LEV_DIMENSION_X):
+                entity = self.level_array[x][y]
+                if isinstance(entity, (PurpleMonster, GreenMonster)):
+                    self.tb_turn_orders[id(entity)] = turn
+                    turn += 1
+
+    def toggle_turn_based(self):
+        """Toggles turn-based mode on/off and resets the current level."""
+        self.turn_based = not self.turn_based
+        self.reset_level()
+
     ## 2. Level Handling Methods
     # =================================================================================
     def load_level(self, level_num):
@@ -281,6 +415,12 @@ class Game:
         self.bananas_remaining = self.num_bananas
 
         self._initialize_entity_animations()
+
+        if self.turn_based:
+            self._tb_assign_turn_orders()
+            self.tb_state = "WAITING_PLAYER"
+            self.tb_current_monster_index = 0
+            self.tb_monsters = []
 
     def _initialize_entity_animations(self):
         """
@@ -572,6 +712,7 @@ class Game:
             "sound_on": self.audio_manager.sound_enabled,
             "volume": self.audio_manager.volume,
             "single_steps": self.single_steps,
+            "turn_based": self.turn_based,
             "buttons_activated": [
                 self.level_number > 1,
                 True,

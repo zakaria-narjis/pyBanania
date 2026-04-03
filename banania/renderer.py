@@ -421,7 +421,8 @@ class Renderer:
             # Draw all the dynamic game entities
             self.draw_level_entities(surface, game)
 
-            # NOTE: HUD elements like score, buttons, etc., would be drawn here
+            # Draw turn order numbers above characters when turn-based mode is on
+            self.draw_turn_order_numbers(surface, game)
 
         # Mode 2: End Screen
         elif game.mode == 2:
@@ -440,6 +441,33 @@ class Renderer:
     def get_image(self, image_id):
         """Helper to allow other managers to access loaded images."""
         return self.images.get(image_id)
+
+    def draw_turn_order_numbers(self, surface, game):
+        """Draws small turn order numbers above each character entity in turn-based mode."""
+        if not game.turn_based:
+            return
+
+        for y in range(LEV_DIMENSION_Y):
+            for x in range(LEV_DIMENSION_X):
+                entity = game.level_array[x][y]
+                turn_order = game.tb_turn_orders.get(id(entity))
+                if turn_order is None:
+                    continue
+
+                # Compute pixel position of the sprite's top-left corner
+                x_pos = LEV_OFFSET_X + x * TILE_SIZE + entity.moving_offset.x
+                y_pos = LEV_OFFSET_Y + y * TILE_SIZE + entity.moving_offset.y
+
+                text_surf = self.font_small.render(str(turn_order), True, (255, 255, 255))
+                shadow_surf = self.font_small.render(str(turn_order), True, (0, 0, 0))
+
+                # Center horizontally above the sprite
+                text_x = x_pos + (TILE_SIZE - text_surf.get_width()) // 2
+                text_y = y_pos - text_surf.get_height()
+
+                # Shadow for readability, then white text on top
+                surface.blit(shadow_surf, (text_x + 1, text_y + 1))
+                surface.blit(text_surf, (text_x, text_y))
 
     def draw_number(self, surface, number, x_right_align, y, total_digits):
         """

@@ -535,6 +535,14 @@ class UIManager:
                 "line": False,
             },
             {
+                "name": "Turn based",
+                "effect_id": 9,
+                "on": can_always,
+                "hotkey": "",
+                "check": 1,
+                "line": False,
+            },
+            {
                 "name": "Sound",
                 "effect_id": 5,
                 "on": can_always,
@@ -605,6 +613,8 @@ class UIManager:
             self.show_dialog(DialogBoxType.LOADLVL)
         elif effect_id == 8:
             self.show_dialog(DialogBoxType.CHARTS)
+        elif effect_id == 9:
+            self.game_callbacks["toggle_turn_based"]()
 
         self.selected_menu_item = -1
 
@@ -893,6 +903,10 @@ class UIManager:
                         or (
                             option["effect_id"] == 4
                             and game_state["single_steps"]
+                        )
+                        or (
+                            option["effect_id"] == 9
+                            and game_state["turn_based"]
                         )
                     )
 
